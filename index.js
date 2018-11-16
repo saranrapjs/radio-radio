@@ -183,7 +183,7 @@ function mainView(state, emit) {
 
 function store(state, emitter) {
 	state.url = false;
-	state.playing = true;
+	state.playing = false;
 	state.days = [];
 	for (let i = 0; i <= 7; i++) {
 		state.days.push({
@@ -206,13 +206,19 @@ function store(state, emitter) {
 		if (playPause !== undefined) {
 			play = playPause;
 		}
-		if (play) {
-			player && player.play();
-		} else {
-			player && player.pause();
+		let promise;
+		if (play && player) {
+			promise = player.play();
+		} else if (player) {
+			player.pause();
+			promise = Promise.resolve();
 		}
-		state.playing = play;
-		emitter.emit("render");
+		if (promise) {
+			promise.then(() => {
+				state.playing = play;
+				emitter.emit("render");
+			});
+		}
 	});
 	emitter.on("new", ({ url, start, end, day }) => {
 		const startTime = DateTime.fromISO(start).setZone("utc");
@@ -220,7 +226,7 @@ function store(state, emitter) {
 		let diff = endTime.diff(startTime);
 		// if this is a negative diff, assume it crosses the day boundary?
 		if (diff < 0) {
-			diff = endTime.plus({ days: 1  }).diff(startTime);
+			diff = endTime.plus({ days: 1 }).diff(startTime);
 		}
 		const time = [startTime.toISOTime(), diff.toISO()];
 		if (day !== "0") {
